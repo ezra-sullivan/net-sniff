@@ -114,8 +114,11 @@ func runUDP(opts *options.Options) error {
 
 		// 输出到文件
 		if opts.OutputWriter != nil && result.Open {
-			fmt.Fprintf(opts.OutputWriter, "%s,%d,UDP,可能开放,%.2f\n",
+			_, err := fmt.Fprintf(opts.OutputWriter, "%s,%d,UDP,可能开放,%.2f\n",
 				result.Host, result.Port, float64(result.Time.Microseconds())/1000.0)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
