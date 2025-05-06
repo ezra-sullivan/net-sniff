@@ -7,16 +7,16 @@ import (
 
 // Options 定义全局配置选项
 type Options struct {
-	Hosts       string
-	Ports       string
-	Concurrency int
-	Timeout     int
-	OutputFile  string
-	Verbose     bool
-	Mode        string
-	LogLevel    string
+	Hosts        string
+	Ports        string
+	Concurrency  int
+	Timeout      int
+	OutputFile   string
+	Verbose      bool
+	Mode         string
+	LogLevel     string
 	OutputWriter *os.File
-	Logger      *slog.Logger
+	Logger       *slog.Logger
 }
 
 // NewOptions 创建默认选项
