@@ -36,12 +36,26 @@ func NewRootCmd() *cobra.Command {
 		Long:          `网络探测工具，支持批量 Ping、TCP/UDP 端口扫描等功能。`,
 		SilenceUsage:  false,
 		SilenceErrors: false,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// 执行命令前打开输出文件
+			return openOutputFile(opts)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// 如果是根命令直接执行，则显示帮助信息
+			return cmd.Help()
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			// 执行命令后关闭输出文件
+			closeOutputFile(opts)
+			return nil
+		},
 	}
 
 	// 添加全局标志
 	rootCmd.PersistentFlags().StringVarP(&opts.LogLevel, "log-level", "l", "info", "日志级别: debug, info, warn, error")
 	rootCmd.PersistentFlags().StringVarP(&opts.Ports, "ports", "p", "", "端口列表，逗号分隔或范围（例如 80,443,8000-8100）")
 	rootCmd.PersistentFlags().IntVarP(&opts.Timeout, "timeout", "t", 1000, "超时时间（毫秒）")
+	rootCmd.PersistentFlags().StringVarP(&opts.OutputFile, "output", "o", "", "输出文件路径")
 
 	// 初始化日志
 	initLogger(opts)
@@ -92,4 +106,12 @@ func openOutputFile(opts *options.Options) error {
 		opts.OutputWriter = file
 	}
 	return nil
+}
+
+// closeOutputFile 关闭输出文件
+func closeOutputFile(opts *options.Options) {
+	if opts.OutputWriter != nil {
+		_ = opts.OutputWriter.Close()
+		opts.OutputWriter = nil
+	}
 }

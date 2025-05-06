@@ -19,6 +19,13 @@ func NewCmdTCP(opts *options.Options) *cobra.Command {
 		SilenceUsage:  false,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// 添加panic恢复机制
+			defer func() {
+				if r := recover(); r != nil {
+					opts.Logger.Error("命令执行过程中发生严重错误", "error", r)
+				}
+			}()
+
 			// 检查主机列表是否为空
 			if opts.Hosts == "" {
 				opts.Logger.Error("必须指定主机列表")
