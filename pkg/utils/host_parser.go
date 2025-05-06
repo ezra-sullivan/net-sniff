@@ -85,7 +85,12 @@ func readHostsFromFile(filePath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			os.Exit(1)
+		}
+	}(file)
 
 	var hosts []string
 	scanner := bufio.NewScanner(file)
