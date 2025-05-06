@@ -2,7 +2,7 @@
 PROJECT_NAME := net-sniff
 MAIN_PATH := ./main.go
 BUILD_DIR := ./build
-VERSION := 1.0.0
+VERSION := 0.0.1
 
 # Go 命令
 GO := go
@@ -23,7 +23,7 @@ ifeq ($(OS),Windows_NT)
     MKDIR = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' }"
     MKDIR_RELEASE = powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Test-Path '$(BUILD_DIR)\release')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)\release' }"
     CHECK_FILE = if exist
-    ZIP = powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Force -Path
+    ZIP = powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Force -Path"
     ZIP_ARGS = -DestinationPath
     # Use cmd to output text, avoid PowerShell encoding issues
     ECHO = cmd /c echo
@@ -130,6 +130,31 @@ else
 	)
 endif
 
+# Build and package tar.gz archives for all platforms
+.PHONY: build-all-tgz
+build-all-tgz: build-all
+	@$(ECHO) "create tar.gz file..."
+ifeq ($(OS),Windows_NT)
+	@$(PS_ENV) "Get-ChildItem -Path '$(BUILD_DIR)' -File | ForEach-Object { $$fileName = $$_.FullName; $$outName = $$fileName -replace '\.exe$$','' ; $$tempDir = Join-Path '$(BUILD_DIR)' ('temp_' + [System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tempDir; Copy-Item -Path $$_.FullName,'LICENSE' -Destination $$tempDir; tar -czf \"$$outName.tar.gz\" -C $$tempDir .; Remove-Item -Recurse -Force $$tempDir }"
+else
+	$(foreach PLATFORM,$(PLATFORMS),\
+		$(foreach ARCH,$(ARCHITECTURES),\
+			$(eval GOOS := $(PLATFORM))\
+			$(eval GOARCH := $(ARCH))\
+			$(eval SUFFIX := $(if $(findstring windows,$(GOOS)),.exe,))\
+			$(eval BINARY := $(BUILD_DIR)/$(PROJECT_NAME)_$(VERSION)_$(GOOS)_$(GOARCH)$(SUFFIX))\
+			$(eval PACKAGE := $(BUILD_DIR)/$(PROJECT_NAME)_$(VERSION)_$(GOOS)_$(GOARCH).tar.gz)\
+			$(CHECK_FILE) $(BINARY) ]; then \
+				echo "Packaging $(GOOS)/$(GOARCH) to tar.gz..." && \
+				(mkdir -p $(BUILD_DIR)/temp && \
+				cp $(BINARY) README.md LICENSE $(BUILD_DIR)/temp/ && \
+				tar -czf $(PACKAGE) -C $(BUILD_DIR)/temp . && \
+				rm -rf $(BUILD_DIR)/temp) || true ; \
+			fi ; \
+		)\
+	)
+endif
+
 # Run tests
 .PHONY: test
 test:
@@ -143,6 +168,7 @@ help:
 	@$(ECHO) "  make              - Clean and build executable for current platform"
 	@$(ECHO) "  make build        - Build executable for current platform"
 	@$(ECHO) "  make build-all    - Build executables for all platforms"
+	@$(ECHO) "  make build-all-tgz - Build executables and package as tar.gz archives"
 	@$(ECHO) "  make clean        - Clean build directory"
 	@$(ECHO) "  make test         - Run tests"
 	@$(ECHO) "  make release      - Build and package all platform releases"
