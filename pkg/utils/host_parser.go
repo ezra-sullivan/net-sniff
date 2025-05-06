@@ -48,19 +48,17 @@ func ParseHostList(hosts string) ([]string, error) {
 			continue
 		}
 
-		// 单个主机，严格验证 IP 地址格式
-		if net.ParseIP(host) == nil {
+		// 单个主机
+		if net.ParseIP(host) != nil || isValidHostname(host) {
+			// 直接添加有效的 IP 地址或主机名
+			result = append(result, host)
+		} else if isInvalidIPFormat(host) {
 			// 检查是否看起来像 IP 地址但格式不正确
-			if isInvalidIPFormat(host) {
-				return nil, fmt.Errorf("无效的 IP 地址格式: %s", host)
-			}
-
-			// 不是有效的 IP 地址，检查是否为有效的主机名
-			if !isValidHostname(host) {
-				return nil, fmt.Errorf("无效的 IP 地址或主机名: %s", host)
-			}
+			return nil, fmt.Errorf("无效的 IP 地址格式: %s", host)
+		} else {
+			// 既不是有效的 IP 也不是有效的主机名
+			return nil, fmt.Errorf("无效的 IP 地址或主机名: %s", host)
 		}
-		result = append(result, host)
 	}
 
 	if len(result) == 0 {
