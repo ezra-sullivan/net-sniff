@@ -15,11 +15,11 @@ import (
 )
 
 // Execute 执行根命令
-func Execute() {
-	if err := NewRootCmd().Execute(); err != nil {
-		os.Exit(1)
-	}
-}
+//func Execute() {
+//	if err := NewRootCmd().Execute(); err != nil {
+//		os.Exit(1)
+//	}
+//}
 
 // NewNetSniffCommand 创建根命令 (与 main.go 中的引用保持一致)
 func NewNetSniffCommand() *cobra.Command {
