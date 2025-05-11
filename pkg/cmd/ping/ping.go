@@ -2,6 +2,7 @@ package ping
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ezra-sullivan/net-sniff/internal/ping"
 	"github.com/ezra-sullivan/net-sniff/pkg/options"
@@ -43,6 +44,7 @@ func NewCmdPing(opts *options.Options) *cobra.Command {
 // addFlags 添加命令特定的标志
 func addFlags(cmd *cobra.Command, opts *options.Options) {
 	cmd.Flags().StringVarP(&opts.Hosts, "hosts", "H", "", "主机列表，逗号分隔或文件路径")
+	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 1000, "超时时间（毫秒）")
 	cmd.Flags().IntVarP(&opts.Concurrency, "concurrency", "c", 100, "并发数")
 	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "输出文件路径")
 	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "显示详细信息")
@@ -57,10 +59,13 @@ func runPing(opts *options.Options) error {
 		return err
 	}
 
-	opts.Logger.Info("开始 Ping", "主机数量", len(hostList), "并发数", opts.Concurrency)
+	opts.Logger.Info("开始 Ping",
+		"主机数量", len(hostList),
+		"并发数", opts.Concurrency,
+		"超时", opts.Timeout)
 
-	// 执行批量 Ping
-	results := ping.BatchPing(hostList, opts.Concurrency)
+	// 执行批量 Ping，传入超时参数
+	results := ping.BatchPing(hostList, opts.Concurrency, time.Duration(opts.Timeout)*time.Millisecond)
 
 	// 统计结果
 	successCount := 0

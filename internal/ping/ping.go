@@ -16,7 +16,7 @@ type PingResult struct {
 }
 
 // SinglePing 对单个主机执行 ping 操作
-func SinglePing(host string) PingResult {
+func SinglePing(host string, timeout time.Duration) PingResult {
 	result := PingResult{
 		Host: host,
 	}
@@ -31,7 +31,7 @@ func SinglePing(host string) PingResult {
 
 	// 设置 ping 参数
 	pinger.Count = 1
-	pinger.Timeout = time.Second * 2
+	pinger.Timeout = timeout   // 使用传入的超时值
 	pinger.SetPrivileged(true) // Windows 系统需要设置为 true
 
 	// 执行 ping
@@ -53,7 +53,7 @@ func SinglePing(host string) PingResult {
 }
 
 // BatchPing 对多个主机执行批量 ping 操作
-func BatchPing(hosts []string, concurrency int) []PingResult {
+func BatchPing(hosts []string, concurrency int, timeout time.Duration) []PingResult {
 	results := make([]PingResult, 0, len(hosts))
 	resultsChan := make(chan PingResult, len(hosts))
 
@@ -68,7 +68,7 @@ func BatchPing(hosts []string, concurrency int) []PingResult {
 			sem <- struct{}{}        // 获取信号量
 			defer func() { <-sem }() // 释放信号量
 
-			resultsChan <- SinglePing(h)
+			resultsChan <- SinglePing(h, timeout) // 传递超时参数
 		}(host)
 	}
 
