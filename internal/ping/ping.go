@@ -1,13 +1,10 @@
 package ping
 
 import (
-	"fmt"
-	"net"
-	"os/exec"
-	"runtime"
-	"strings"
 	"sync"
 	"time"
+
+	probing "github.com/prometheus-community/pro-bing"
 )
 
 // PingResult 存储 ping 的结果
@@ -18,22 +15,28 @@ type PingResult struct {
 	Error   error
 }
 
-// PingHost 对单个主机执行 ping 操作
-func PingHost(host string) PingResult {
+// SinglePing 对单个主机执行 ping 操作
+func SinglePing(host string) PingResult {
 	result := PingResult{
 		Host: host,
 	}
 
-	// 使用系统 ping 命令
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("ping", "-n", "1", "-w", "1000", host)
-	} else {
-		cmd = exec.Command("ping", "-c", "1", "-W", "1", host)
+	// 创建新的 pinger
+	pinger, err := probing.NewPinger(host)
+	if err != nil {
+		result.Success = false
+		result.Error = err
+		return result
 	}
 
+	// 设置 ping 参数
+	pinger.Count = 1
+	pinger.Timeout = time.Second * 2
+	pinger.SetPrivileged(true) // Windows 系统需要设置为 true
+
+	// 执行 ping
 	startTime := time.Now()
-	output, err := cmd.CombinedOutput()
+	err = pinger.Run()
 	result.Time = time.Since(startTime)
 
 	if err != nil {
@@ -42,13 +45,9 @@ func PingHost(host string) PingResult {
 		return result
 	}
 
-	// 检查输出是否包含成功的响应
-	outputStr := string(output)
-	if runtime.GOOS == "windows" {
-		result.Success = strings.Contains(outputStr, "TTL=")
-	} else {
-		result.Success = strings.Contains(outputStr, " 0% packet loss")
-	}
+	// 获取统计信息
+	stats := pinger.Statistics()
+	result.Success = stats.PacketsRecv > 0
 
 	return result
 }
@@ -69,7 +68,7 @@ func BatchPing(hosts []string, concurrency int) []PingResult {
 			sem <- struct{}{}        // 获取信号量
 			defer func() { <-sem }() // 释放信号量
 
-			resultsChan <- PingHost(h)
+			resultsChan <- SinglePing(h)
 		}(host)
 	}
 
@@ -85,21 +84,4 @@ func BatchPing(hosts []string, concurrency int) []PingResult {
 	}
 
 	return results
-}
-
-// ResolveHostname 将主机名解析为 IP 地址
-func ResolveHostname(hostname string) (string, error) {
-	ips, err := net.LookupIP(hostname)
-	if err != nil {
-		return "", err
-	}
-
-	// 返回第一个 IPv4 地址
-	for _, ip := range ips {
-		if ipv4 := ip.To4(); ipv4 != nil {
-			return ipv4.String(), nil
-		}
-	}
-
-	return "", fmt.Errorf("no IPv4 address found for %s", hostname)
 }
