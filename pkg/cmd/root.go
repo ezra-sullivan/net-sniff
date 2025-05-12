@@ -1,12 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
-	"log/slog"
-
 	"github.com/ezra-sullivan/net-sniff/pkg/cmd/ping"
 	"github.com/ezra-sullivan/net-sniff/pkg/cmd/tcp"
 	"github.com/ezra-sullivan/net-sniff/pkg/cmd/udp"
@@ -37,28 +31,30 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  false,
 		SilenceErrors: false,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// 执行命令前打开输出文件
-			return openOutputFile(opts)
+			// 初始化日志
+			return opts.InitOpts()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 如果是根命令直接执行，则显示帮助信息
 			return cmd.Help()
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			// 执行命令后关闭输出文件
-			closeOutputFile(opts)
+			// 添加命令执行后的清理工作
+			err := opts.Close()
+			if err != nil {
+				opts.Logger.Error("关闭资源错误", "error", err)
+				return err
+			}
 			return nil
 		},
 	}
 
 	// 添加全局标志
-	rootCmd.PersistentFlags().StringVarP(&opts.LogLevel, "log-level", "l", "info", "日志级别: debug, info, warn, error")
-	rootCmd.PersistentFlags().StringVarP(&opts.Ports, "ports", "p", "", "端口列表，逗号分隔或范围（例如 80,443,8000-8100）")
 	rootCmd.PersistentFlags().IntVarP(&opts.Timeout, "timeout", "t", 1000, "超时时间（毫秒）")
+	rootCmd.PersistentFlags().IntVarP(&opts.Concurrency, "concurrency", "c", 100, "并发数")
 	rootCmd.PersistentFlags().StringVarP(&opts.OutputFile, "output", "o", "", "输出文件路径")
-
-	// 初始化日志
-	initLogger(opts)
+	rootCmd.PersistentFlags().BoolVarP(&opts.Verbose, "verbose", "v", false, "详细模式")
+	rootCmd.PersistentFlags().StringVarP(&opts.LogLevel, "log-level", "l", "info", "日志级别: debug, info, warn, error")
 
 	// 添加子命令
 	rootCmd.AddCommand(ping.NewCmdPing(opts))
@@ -66,52 +62,4 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(udp.NewCmdUDP(opts))
 
 	return rootCmd
-}
-
-// initLogger 初始化日志
-func initLogger(opts *options.Options) {
-	// 设置日志级别
-	var level slog.Level
-	switch strings.ToLower(opts.LogLevel) {
-	case "debug":
-		level = slog.LevelDebug
-	case "info":
-		level = slog.LevelInfo
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-
-	// 创建日志处理器
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-	})
-
-	// 设置全局日志记录器
-	logger := slog.New(handler)
-	slog.SetDefault(logger)
-	opts.Logger = logger
-}
-
-// openOutputFile 打开输出文件
-func openOutputFile(opts *options.Options) error {
-	if opts.OutputFile != "" {
-		file, err := os.Create(opts.OutputFile)
-		if err != nil {
-			return fmt.Errorf("无法创建输出文件: %w", err)
-		}
-		opts.OutputWriter = file
-	}
-	return nil
-}
-
-// closeOutputFile 关闭输出文件
-func closeOutputFile(opts *options.Options) {
-	if opts.OutputWriter != nil {
-		_ = opts.OutputWriter.Close()
-		opts.OutputWriter = nil
-	}
 }

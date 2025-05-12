@@ -1,8 +1,10 @@
 package options
 
 import (
+	"io"
 	"log/slog"
 	"os"
+	"strings"
 )
 
 // Options 定义全局配置选项
@@ -11,12 +13,12 @@ type Options struct {
 	Ports        string
 	Concurrency  int
 	Timeout      int
-	OutputFile   string
 	Verbose      bool
 	Mode         string
+	OutputFile   string
 	LogLevel     string
-	OutputWriter *os.File
 	Logger       *slog.Logger
+	OutputWriter io.WriteCloser // 添加输出文件写入器
 }
 
 // NewOptions 创建默认选项
@@ -28,10 +30,27 @@ func NewOptions() *Options {
 	}
 }
 
-// InitLogger 初始化日志记录器
-func (o *Options) InitLogger() {
+func (opts *Options) InitOpts() error {
+	var err error
+	// 初始化日志
+	err = opts.InitLogger()
+	if err != nil {
+		return err
+	}
+	// 初始化输出文件
+	err = opts.InitOutputFile()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InitLogger 初始化日志
+func (opts *Options) InitLogger() error {
+	// 设置日志级别
 	var level slog.Level
-	switch o.LogLevel {
+	switch strings.ToLower(opts.LogLevel) {
 	case "debug":
 		level = slog.LevelDebug
 	case "info":
@@ -43,11 +62,38 @@ func (o *Options) InitLogger() {
 	default:
 		level = slog.LevelInfo
 	}
-
-	opts := &slog.HandlerOptions{
+	// 创建日志处理器
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
+	})
+
+	// 设置全局日志记录器
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+	opts.Logger = logger
+
+	return nil
+}
+
+// InitOutputFile 初始化输出文件
+func (opts *Options) InitOutputFile() error {
+	var err error
+	if opts.OutputFile != "" {
+		opts.OutputWriter, err = os.Create(opts.OutputFile)
+		if err != nil {
+			if opts.Logger != nil {
+				opts.Logger.Error("创建输出文件错误", "error", err)
+			}
+			return err
+		}
 	}
-	handler := slog.NewTextHandler(os.Stdout, opts)
-	o.Logger = slog.New(handler)
-	slog.SetDefault(o.Logger)
+	return nil
+}
+
+// Close 实现 io.Closer 接口，关闭资源
+func (opts *Options) Close() error {
+	if opts.OutputWriter != nil {
+		return opts.OutputWriter.Close()
+	}
+	return nil
 }
