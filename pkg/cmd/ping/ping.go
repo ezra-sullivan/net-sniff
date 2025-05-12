@@ -44,10 +44,6 @@ func NewCmdPing(opts *options.Options) *cobra.Command {
 // addFlags 添加命令特定的标志
 func addFlags(cmd *cobra.Command, opts *options.Options) {
 	cmd.Flags().StringVarP(&opts.Hosts, "hosts", "H", "", "主机列表，逗号分隔或文件路径")
-	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 1000, "超时时间（毫秒）")
-	cmd.Flags().IntVarP(&opts.Concurrency, "concurrency", "c", 100, "并发数")
-	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "输出文件路径")
-	cmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "显示详细信息")
 }
 
 // runPing 执行 ping 命令
