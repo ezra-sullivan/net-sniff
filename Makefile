@@ -2,7 +2,7 @@
 PROJECT_NAME := net-sniff
 MAIN_PATH := ./main.go
 BUILD_DIR := ./build
-VERSION := 0.0.1
+VERSION := 0.1.1
 
 # Go 命令
 GO := go
