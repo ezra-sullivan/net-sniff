@@ -2,6 +2,7 @@ package pscan
 
 import (
 	"fmt"
+	"github.com/ezra-sullivan/net-sniff/internal/global"
 	"net"
 	"sync"
 	"time"
@@ -9,34 +10,48 @@ import (
 
 // TCPScanResult 存储 TCP 端口扫描结果
 type TCPScanResult struct {
-	Host  string
-	Port  int
-	Open  bool
-	Error error
-	Time  time.Duration
+	Success bool
+	Host    string
+	Port    int
+	IsOpen  bool
+	Error   error
+	Time    time.Duration
 }
 
 // ScanTCPPort 扫描单个 TCP 端口
+// ScanTCPPort 函数用于扫描指定的TCP端口是否开放
 func ScanTCPPort(host string, port int, timeout time.Duration) TCPScanResult {
-	result := TCPScanResult{
-		Host: host,
-		Port: port,
-	}
 
+	// 将主机名和端口号拼接成地址
 	address := fmt.Sprintf("%s:%d", host, port)
+	// 记录开始时间
 	startTime := time.Now()
 
+	// 尝试连接指定的TCP端口
 	conn, err := net.DialTimeout("tcp", address, timeout)
-	result.Time = time.Since(startTime)
 
-	if err != nil {
-		result.Open = false
-		result.Error = err
-		return result
+	// 在连接尝试后立即计算时间
+	deration := time.Since(startTime)
+	result := TCPScanResult{
+		Host:   host,
+		Port:   port,
+		Time:   deration,
+		Error:  err,
+		IsOpen: err == nil,
 	}
 
-	defer conn.Close()
-	result.Open = true
+	// 如果连接失败，则设置结果为未开放，并返回结果
+	if conn != nil {
+		defer func() {
+			err = conn.Close()
+			if err != nil {
+				result.Error = fmt.Errorf("注意内存溢出，关闭连接失败: %w", err)
+			}
+		}()
+	}
+
+	result.output()
+	// 返回结果
 	return result
 }
 
@@ -75,4 +90,41 @@ func BatchScanTCPPorts(hosts []string, ports []int, concurrency int, timeout tim
 	}
 
 	return results
+}
+
+// 定义一个名为output的函数
+func (result *TCPScanResult) output() {
+	// 获取全局的 consoleLogger
+	consoleLogger := global.ConsoleLogger
+	if result.IsOpen {
+		// 打印TCP端口开放结果
+		consoleLogger.Info("TCP Port Scan Result",
+			"host", result.Host,
+			"port", result.Port,
+			"status", "open",
+			"time_ms", float64(result.Time.Microseconds())/1000.0,
+		)
+	} else {
+		consoleLogger.Debug("TCP Port Scan Result",
+			"host", result.Host,
+			"port", result.Port,
+			"status", "closed",
+			"time_ms", float64(result.Time.Microseconds())/1000.0,
+			"err", result.Error,
+		)
+	}
+
+	// 获取全局的 fileLogger
+	fileLogger := global.FileLogger
+	// 如果 fileLogger 不为空
+	if fileLogger != nil {
+		if result.IsOpen {
+			// 打印 TCP 端口开放结果到文件
+			fileLogger.Info(fmt.Sprintf("%s,%d,%s,%.2f\n", result.Host, result.Port, "open", float64(result.Time.Microseconds())/1000.0))
+		} else {
+			// 打印TCP端口关闭结果到文件
+			fileLogger.Debug(fmt.Sprintf("%s,%d,%s,%.2f\n", result.Host, result.Port, "closed", float64(result.Time.Microseconds())/1000.0))
+		}
+	}
+
 }
